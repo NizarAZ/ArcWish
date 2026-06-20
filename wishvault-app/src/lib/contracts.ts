@@ -1,4 +1,4 @@
-import { BrowserProvider, Contract, JsonRpcProvider, type Eip1193Provider, type EventLog, type JsonRpcSigner } from "ethers";
+import { BrowserProvider, Contract, JsonRpcProvider, type Eip1193Provider, type JsonRpcSigner } from "ethers";
 import { ARC_RPC, ARC_TESTNET, ARC_TESTNET_WALLET_PARAMS, ARC_USDC_ADDRESS, WISH_REGISTRY_ADDRESS, WISH_REGISTRY_DEPLOY_BLOCK } from "@/lib/arc-config";
 import { ERC20_ABI, WISH_REGISTRY_ABI } from "@/lib/abis";
 
@@ -43,9 +43,12 @@ export type ActivityItem = {
   detail: string;
   txHash: string;
   blockNumber: number;
+  logIndex: number;
 };
 
 export const readProvider = new JsonRpcProvider(ARC_RPC, ARC_TESTNET.chainIdDecimal);
+const EVENT_QUERY_BLOCK_SPAN = 9_500;
+const ACTIVITY_EVENT_NAMES = new Set<ActivityKind>(["WishCreated", "Donated", "Withdrawn", "WishClosed"]);
 
 export function hasRegistryAddress() {
   return Boolean(WISH_REGISTRY_ADDRESS && WISH_REGISTRY_ADDRESS !== "0x0000000000000000000000000000000000000000");
@@ -158,7 +161,7 @@ export async function getSignerContracts(signer: JsonRpcSigner) {
   };
 }
 
-export async function loadWishes(): Promise<Wish[]> {
+export async function loadWishes(options: { includeWithoutAvatar?: boolean } = {}): Promise<Wish[]> {
   const registry = getReadRegistry();
   if (!registry) return [];
 
@@ -182,67 +185,75 @@ export async function loadWishes(): Promise<Wish[]> {
     })
   );
 
-  return wishes.filter(hasWishAvatar);
+  return options.includeWithoutAvatar ? wishes : wishes.filter(hasWishAvatar);
 }
 
 export async function loadActivity(): Promise<ActivityItem[]> {
   const registry = getReadRegistry();
   if (!registry) return [];
 
-  const [created, donated, withdrawn, closed] = await Promise.all([
-    registry.queryFilter(registry.filters.WishCreated(), WISH_REGISTRY_DEPLOY_BLOCK),
-    registry.queryFilter(registry.filters.Donated(), WISH_REGISTRY_DEPLOY_BLOCK),
-    registry.queryFilter(registry.filters.Withdrawn(), WISH_REGISTRY_DEPLOY_BLOCK),
-    registry.queryFilter(registry.filters.WishClosed(), WISH_REGISTRY_DEPLOY_BLOCK)
-  ]);
+  const latestBlock = await readProvider.getBlockNumber();
+  if (WISH_REGISTRY_DEPLOY_BLOCK > latestBlock) return [];
 
-  const events = [...created, ...donated, ...withdrawn, ...closed]
-    .filter((event): event is EventLog => "args" in event)
-    .map((event) => {
-      const name = event.fragment.name as ActivityKind;
+  const queries = [];
+  for (let fromBlock = WISH_REGISTRY_DEPLOY_BLOCK; fromBlock <= latestBlock; fromBlock += EVENT_QUERY_BLOCK_SPAN + 1) {
+    const toBlock = Math.min(fromBlock + EVENT_QUERY_BLOCK_SPAN, latestBlock);
+    queries.push(readProvider.getLogs({ address: WISH_REGISTRY_ADDRESS, fromBlock, toBlock }));
+  }
+
+  const events = (await Promise.all(queries))
+    .flat()
+    .flatMap((log): ActivityItem[] => {
+      const parsed = registry.interface.parseLog({ topics: log.topics, data: log.data });
+      const name = parsed?.name as ActivityKind | undefined;
+      if (!parsed || !name || !ACTIVITY_EVENT_NAMES.has(name)) return [];
       if (name === "WishCreated") {
-        return {
+        return [{
           kind: name,
-          wishId: event.args.wishId,
-          actor: event.args.creator,
+          wishId: parsed.args.wishId,
+          actor: parsed.args.creator,
           detail: "planted a new specimen",
-          txHash: event.transactionHash,
-          blockNumber: event.blockNumber
-        };
+          txHash: log.transactionHash,
+          blockNumber: log.blockNumber,
+          logIndex: log.index
+        }];
       }
       if (name === "Donated") {
-        return {
+        return [{
           kind: name,
-          wishId: event.args.wishId,
-          actor: event.args.donor,
-          amount: event.args.amount,
+          wishId: parsed.args.wishId,
+          actor: parsed.args.donor,
+          amount: parsed.args.amount,
           detail: "helped it grow",
-          txHash: event.transactionHash,
-          blockNumber: event.blockNumber
-        };
+          txHash: log.transactionHash,
+          blockNumber: log.blockNumber,
+          logIndex: log.index
+        }];
       }
       if (name === "Withdrawn") {
-        return {
+        return [{
           kind: name,
-          wishId: event.args.wishId,
-          actor: event.args.recipient,
-          amount: event.args.amount,
+          wishId: parsed.args.wishId,
+          actor: parsed.args.recipient,
+          amount: parsed.args.amount,
           detail: "collected funds",
-          txHash: event.transactionHash,
-          blockNumber: event.blockNumber
-        };
+          txHash: log.transactionHash,
+          blockNumber: log.blockNumber,
+          logIndex: log.index
+        }];
       }
-      return {
+      return [{
         kind: name,
-        wishId: event.args.wishId,
+        wishId: parsed.args.wishId,
         actor: "",
         detail: "closed to new donations",
-        txHash: event.transactionHash,
-        blockNumber: event.blockNumber
-      };
+        txHash: log.transactionHash,
+        blockNumber: log.blockNumber,
+        logIndex: log.index
+      }];
     });
 
-  return events.sort((a, b) => b.blockNumber - a.blockNumber);
+  return events.sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex);
 }
 
 export function describeWalletError(error: unknown, fallback: string) {

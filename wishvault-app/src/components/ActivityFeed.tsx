@@ -48,7 +48,7 @@ export function ActivityFeed({ activity, wishes, limit, compactEmpty = false }: 
         const wish = wishes.find((candidate) => candidate.id === item.wishId);
         return (
           <motion.article
-            key={`${item.txHash}-${item.kind}-${item.wishId.toString()}`}
+            key={`${item.txHash}-${item.logIndex}-${item.kind}-${item.wishId.toString()}`}
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.25, delay: index * 0.04 }}

@@ -15,11 +15,12 @@ import { cn } from "@/lib/utils";
 
 type ExploreProps = {
   wishes: Wish[];
+  activityWishes: Wish[];
   activity: ActivityItem[];
   isLoading: boolean;
 };
 
-export function Explore({ wishes, activity, isLoading }: ExploreProps) {
+export function Explore({ wishes, activityWishes, activity, isLoading }: ExploreProps) {
   const [walletSearch, setWalletSearch] = useState("");
   const [wishFilter, setWishFilter] = useState<"open" | "closed">("open");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -181,7 +182,7 @@ export function Explore({ wishes, activity, isLoading }: ExploreProps) {
           <h3 className="font-display text-2xl font-medium text-moss">Recent activity</h3>
           <p className="mt-1 text-sm text-moss/70">Every planted, watered, and collected wish is linked to Arcscan.</p>
         </div>
-        <ActivityFeed activity={activity} wishes={wishes} limit={5} />
+        <ActivityFeed activity={activity} wishes={activityWishes} limit={5} />
       </section>
     </section>
   );
