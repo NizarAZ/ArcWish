@@ -11,38 +11,84 @@ type WishImageProps = {
 export function WishImage({ imageURI, alt, className, fallback }: WishImageProps) {
   const sources = useMemo(() => resolveImageUrls(imageURI), [imageURI]);
   const sourceKey = sources.join("|");
-  const [sourceIndex, setSourceIndex] = useState(0);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [activeSrc, setActiveSrc] = useState<string>();
+  const [isLoading, setIsLoading] = useState(false);
   const [failed, setFailed] = useState(false);
-  const src = sources[sourceIndex];
 
   useEffect(() => {
-    setSourceIndex(0);
-    setIsLoaded(false);
+    let cancelled = false;
+    setActiveSrc(undefined);
+    setIsLoading(Boolean(sources.length));
     setFailed(false);
-  }, [sourceKey]);
 
-  if (!src || failed) return <>{fallback}</>;
+    if (!sources.length) {
+      setIsLoading(false);
+      setFailed(true);
+      return;
+    }
+
+    async function loadNext(index: number) {
+      const src = sources[index];
+      if (!src) {
+        if (!cancelled) {
+          setIsLoading(false);
+          setFailed(true);
+        }
+        return;
+      }
+
+      try {
+        await preloadImage(src);
+        if (!cancelled) {
+          setActiveSrc(src);
+          setIsLoading(false);
+        }
+      } catch {
+        void loadNext(index + 1);
+      }
+    }
+
+    void loadNext(0);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sourceKey, sources]);
+
+  if (failed) return <>{fallback}</>;
 
   return (
-    <>
-      {!isLoaded ? fallback : null}
-      <img
-        src={src}
-        alt={alt}
-        className={className}
-        style={{ objectPosition: imageObjectPosition(imageURI), display: isLoaded ? "block" : "none" }}
-        onLoad={() => setIsLoaded(true)}
-        onError={() => {
-          const nextIndex = sourceIndex + 1;
-          if (nextIndex < sources.length) {
-            setSourceIndex(nextIndex);
-            setIsLoaded(false);
-            return;
-          }
-          setFailed(true);
-        }}
-      />
-    </>
+    <div className="relative h-full w-full overflow-hidden bg-glasshouse">
+      {isLoading ? <ImageLoadingPlate /> : null}
+      {activeSrc ? (
+        <img
+          src={activeSrc}
+          alt={alt}
+          className={`absolute inset-0 animate-[image-reveal_220ms_ease-out] ${className ?? ""}`}
+          loading="lazy"
+          decoding="async"
+          style={{ objectPosition: imageObjectPosition(imageURI) }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function preloadImage(src: string) {
+  return new Promise<void>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("Image failed to load."));
+    image.decoding = "async";
+    image.src = src;
+    if (image.complete && image.naturalWidth > 0) resolve();
+  });
+}
+
+function ImageLoadingPlate() {
+  return (
+    <div className="absolute inset-0 grid place-items-center bg-glasshouse">
+      <div className="h-full w-full animate-pulse bg-[linear-gradient(110deg,rgba(248,249,243,0.35),rgba(248,249,243,0.85),rgba(248,249,243,0.35))]" />
+    </div>
   );
 }

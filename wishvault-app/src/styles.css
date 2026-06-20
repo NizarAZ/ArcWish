@@ -67,6 +67,17 @@ textarea {
   filter: url("#watercolor-filter");
 }
 
+@keyframes image-reveal {
+  from {
+    opacity: 0;
+    transform: scale(1.01);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
