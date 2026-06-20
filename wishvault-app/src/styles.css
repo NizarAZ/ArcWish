@@ -1,0 +1,79 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 96 22% 93%;
+  --foreground: 123 14% 20%;
+  --card: 70 33% 96%;
+  --card-foreground: 123 14% 20%;
+  --popover: 70 33% 96%;
+  --popover-foreground: 123 14% 20%;
+  --primary: 17 60% 45%;
+  --primary-foreground: 70 33% 96%;
+  --secondary: 119 22% 45%;
+  --secondary-foreground: 70 33% 96%;
+  --muted: 94 20% 89%;
+  --muted-foreground: 122 13% 34%;
+  --accent: 41 67% 55%;
+  --accent-foreground: 123 14% 20%;
+  --destructive: 10 65% 42%;
+  --destructive-foreground: 70 33% 96%;
+  --border: 120 13% 73%;
+  --input: 120 13% 73%;
+  --ring: 41 67% 55%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color: #2b3a2c;
+  background: #edf1e9;
+  font-family: Inter, sans-serif;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    linear-gradient(rgba(43, 58, 44, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(43, 58, 44, 0.025) 1px, transparent 1px),
+    #edf1e9;
+  background-size: 24px 24px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+a,
+input,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mono-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.watercolor {
+  filter: url("#watercolor-filter");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}
