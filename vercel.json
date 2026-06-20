@@ -1,0 +1,11 @@
+{
+  "installCommand": "npm --prefix wishvault-app install",
+  "buildCommand": "npm --prefix wishvault-app run build",
+  "outputDirectory": "wishvault-app/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
