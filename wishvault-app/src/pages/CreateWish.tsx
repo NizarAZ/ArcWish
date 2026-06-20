@@ -105,7 +105,7 @@ export function CreateWish({ onConfirmed }: CreateWishProps) {
   }
 
   function setFocusFromPreview(event: MouseEvent<HTMLButtonElement>) {
-    if (!draft.imageURI) {
+    if (!draft.imageURI && !localImagePreview) {
       imageInputRef.current?.click();
       return;
     }
@@ -287,7 +287,7 @@ export function CreateWish({ onConfirmed }: CreateWishProps) {
               }
               failureFallback={<PreviewImageFailure />}
             />
-            {draft.imageURI ? (
+            {draft.imageURI || localImagePreview ? (
               <span
                 className="pointer-events-none absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-paper bg-clay shadow-sm ring-1 ring-moss/25"
                 style={{ left: `${imageFocus.x}%`, top: `${imageFocus.y}%` }}
