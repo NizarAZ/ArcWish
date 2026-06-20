@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { Image, Sprout, Upload, X } from "lucide-react";
@@ -39,6 +39,7 @@ export function CreateWish({ onConfirmed }: CreateWishProps) {
   const [isBusy, setIsBusy] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [localImagePreview, setLocalImagePreview] = useState<string>();
   const [reviewOpen, setReviewOpen] = useState(false);
   const { register, handleSubmit, setValue, watch } = useForm<CreateWishForm>({
     defaultValues: { title: "", description: "", imageURI: "", imageFocusX: "50", imageFocusY: "50", goal: "", recipient: "" }
@@ -50,14 +51,24 @@ export function CreateWish({ onConfirmed }: CreateWishProps) {
   };
   const focusedImageURI = buildImageURIWithFocus(draft.imageURI, imageFocus);
   const imageURIField = register("imageURI", {
-    onChange: (event) => syncFocusFromImageURI(event.currentTarget.value)
+    onChange: (event) => {
+      setLocalImagePreview(undefined);
+      syncFocusFromImageURI(event.currentTarget.value);
+    }
   });
+
+  useEffect(() => {
+    return () => {
+      if (localImagePreview) URL.revokeObjectURL(localImagePreview);
+    };
+  }, [localImagePreview]);
 
   async function onImageFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
 
+    setLocalImagePreview(URL.createObjectURL(file));
     setIsUploading(true);
     setUploadProgress(0);
     setStatus("Uploading this specimen image to IPFS.");
@@ -68,6 +79,7 @@ export function CreateWish({ onConfirmed }: CreateWishProps) {
       setValue("imageFocusY", "50", { shouldDirty: true, shouldTouch: true });
       setStatus(`Image pinned to IPFS: ${result.cid}`);
     } catch (error) {
+      setLocalImagePreview(undefined);
       setStatus(error instanceof Error ? error.message : "That image could not be attached.");
     } finally {
       setIsUploading(false);
@@ -75,6 +87,7 @@ export function CreateWish({ onConfirmed }: CreateWishProps) {
   }
 
   function clearImage() {
+    setLocalImagePreview(undefined);
     setValue("imageURI", "", { shouldDirty: true, shouldTouch: true });
     setValue("imageFocusX", "50", { shouldDirty: true, shouldTouch: true });
     setValue("imageFocusY", "50", { shouldDirty: true, shouldTouch: true });
@@ -261,6 +274,7 @@ export function CreateWish({ onConfirmed }: CreateWishProps) {
           >
             <WishImage
               imageURI={focusedImageURI}
+              previewSrc={localImagePreview}
               alt=""
               className="h-full w-full object-cover"
               fallback={
@@ -271,6 +285,7 @@ export function CreateWish({ onConfirmed }: CreateWishProps) {
                 </div>
               </div>
               }
+              failureFallback={<PreviewImageFailure />}
             />
             {draft.imageURI ? (
               <span
@@ -317,6 +332,17 @@ export function CreateWish({ onConfirmed }: CreateWishProps) {
         </div>
       </MotionConfirmDialog>
     </section>
+  );
+}
+
+function PreviewImageFailure() {
+  return (
+    <div className="grid h-full place-items-center px-6 text-center">
+      <div className="grid max-w-xs place-items-center gap-2 text-moss/70">
+        <Image className="h-10 w-10 text-clay" aria-hidden="true" />
+        <p className="text-sm leading-6">Image is not reachable from its gateways. Upload again or paste a reachable image URL.</p>
+      </div>
+    </div>
   );
 }
 

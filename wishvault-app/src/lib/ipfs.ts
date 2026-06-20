@@ -1,8 +1,7 @@
 import { PINATA_GATEWAY, PINATA_JWT } from "@/lib/arc-config";
 
 const PINATA_PIN_FILE_ENDPOINT = "https://api.pinata.cloud/pinning/pinFileToIPFS";
-const PUBLIC_IPFS_GATEWAY = "https://ipfs.io/ipfs";
-const FALLBACK_IPFS_GATEWAYS = ["https://w3s.link/ipfs", "https://dweb.link/ipfs"];
+const PUBLIC_IPFS_GATEWAYS = ["https://gateway.pinata.cloud/ipfs", "https://w3s.link/ipfs", "https://dweb.link/ipfs", "https://ipfs.io/ipfs"];
 export const MAX_PINATA_IMAGE_BYTES = 10 * 1024 * 1024;
 const DEFAULT_IMAGE_FOCUS = { x: 50, y: 50 } as const;
 
@@ -109,7 +108,7 @@ export function ipfsToGatewayUrl(ipfsUri: string) {
 export function ipfsToGatewayUrls(ipfsUri: string) {
   const path = ipfsUri.replace(/^ipfs:\/\//, "").replace(/^ipfs\//, "");
   if (!path) return [];
-  return unique([normalizeGateway(PINATA_GATEWAY), PUBLIC_IPFS_GATEWAY, ...FALLBACK_IPFS_GATEWAYS])
+  return unique([normalizeGateway(PINATA_GATEWAY), ...PUBLIC_IPFS_GATEWAYS])
     .filter((gateway): gateway is string => Boolean(gateway))
     .map((gateway) => `${gateway}/${path}`);
 }

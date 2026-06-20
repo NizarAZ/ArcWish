@@ -3,13 +3,20 @@ import { imageObjectPosition, resolveImageUrls } from "@/lib/ipfs";
 
 type WishImageProps = {
   imageURI?: string;
+  previewSrc?: string;
   alt: string;
   className?: string;
   fallback: ReactNode;
+  failureFallback?: ReactNode;
 };
 
-export function WishImage({ imageURI, alt, className, fallback }: WishImageProps) {
-  const sources = useMemo(() => resolveImageUrls(imageURI), [imageURI]);
+const IMAGE_LOAD_TIMEOUT_MS = 4_500;
+
+export function WishImage({ imageURI, previewSrc, alt, className, fallback, failureFallback }: WishImageProps) {
+  const sources = useMemo(() => {
+    const remoteSources = resolveImageUrls(imageURI);
+    return previewSrc ? [previewSrc, ...remoteSources.filter((src) => src !== previewSrc)] : remoteSources;
+  }, [imageURI, previewSrc]);
   const sourceKey = sources.join("|");
   const [activeSrc, setActiveSrc] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
@@ -27,35 +34,25 @@ export function WishImage({ imageURI, alt, className, fallback }: WishImageProps
       return;
     }
 
-    async function loadNext(index: number) {
-      const src = sources[index];
-      if (!src) {
-        if (!cancelled) {
-          setIsLoading(false);
-          setFailed(true);
-        }
-        return;
-      }
-
+    async function loadSources() {
       try {
-        await preloadImage(src);
-        if (!cancelled) {
-          setActiveSrc(src);
-          setIsLoading(false);
-        }
+        const src = await firstLoadedImage(sources);
+        if (!cancelled) setActiveSrc(src);
       } catch {
-        void loadNext(index + 1);
+        if (!cancelled) setFailed(true);
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     }
 
-    void loadNext(0);
+    void loadSources();
 
     return () => {
       cancelled = true;
     };
   }, [sourceKey, sources]);
 
-  if (failed) return <>{fallback}</>;
+  if (failed) return <>{failureFallback ?? fallback}</>;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-glasshouse">
@@ -74,14 +71,48 @@ export function WishImage({ imageURI, alt, className, fallback }: WishImageProps
   );
 }
 
+function firstLoadedImage(sources: string[]) {
+  return new Promise<string>((resolve, reject) => {
+    let pending = sources.length;
+    let settled = false;
+
+    sources.forEach((src) => {
+      preloadImage(src)
+        .then(() => {
+          if (settled) return;
+          settled = true;
+          resolve(src);
+        })
+        .catch(() => {
+          pending -= 1;
+          if (!settled && pending === 0) reject(new Error("All image sources failed."));
+        });
+    });
+  });
+}
+
 function preloadImage(src: string) {
   return new Promise<void>((resolve, reject) => {
     const image = new Image();
-    image.onload = () => resolve();
-    image.onerror = () => reject(new Error("Image failed to load."));
+    const timeoutId = window.setTimeout(() => {
+      image.onload = null;
+      image.onerror = null;
+      reject(new Error("Image load timed out."));
+    }, IMAGE_LOAD_TIMEOUT_MS);
+    image.onload = () => {
+      window.clearTimeout(timeoutId);
+      resolve();
+    };
+    image.onerror = () => {
+      window.clearTimeout(timeoutId);
+      reject(new Error("Image failed to load."));
+    };
     image.decoding = "async";
     image.src = src;
-    if (image.complete && image.naturalWidth > 0) resolve();
+    if (image.complete && image.naturalWidth > 0) {
+      window.clearTimeout(timeoutId);
+      resolve();
+    }
   });
 }
 
